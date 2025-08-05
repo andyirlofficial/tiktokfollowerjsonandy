@@ -5,26 +5,35 @@ import os
 
 app = Flask(__name__)
 
-follower_count = {"username": "andyirlofficial", "followers": 0}
+# Replace with your real sessionid
+SESSIONID = os.environ.get("TIKTOK_SESSIONID", "your-session-id-here")
+
+follower_data = {"username": "andyirlofficial", "followers": 0}
 
 def update_followers():
+    global follower_data
     try:
-        with TikTokApi() as api:
-            user = api.user(username="andyirlofficial")
-            follower_count["followers"] = user.info()["stats"]["followerCount"]
-    except Exception as e:
-        print("Error fetching TikTok data:", e)
+        api = TikTokApi()
+        api._get_sessionid = lambda: SESSIONID  # Inject sessionid manually
 
-# Run update every 5 seconds
+        user = api.user(username="andyirlofficial")
+        stats = user.info(full_response=True)
+        count = stats['userInfo']['stats']['followerCount']
+
+        follower_data["followers"] = count
+        print("Updated follower count:", count)
+
+    except Exception as e:
+        print("Error fetching follower count:", e)
+
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=update_followers, trigger="interval", seconds=5)
+scheduler.add_job(update_followers, 'interval', seconds=5)
 scheduler.start()
 
 @app.route("/followers.json")
-def get_followers():
-    return jsonify(follower_count)
+def get_follower_json():
+    return jsonify(follower_data)
 
-# Only for local test. Use gunicorn in production (Render).
 if __name__ == "__main__":
     update_followers()
     app.run(host="0.0.0.0", port=5000)
